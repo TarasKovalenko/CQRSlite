@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Threading.Tasks;
 using CQRSlite.Bus;
 using CQRSlite.Domain.Exception;
@@ -17,6 +18,16 @@ namespace CQRSlite.Tests.Bus
 		
         [Fact]
         public async Task Should_publish_to_all_handlers()
+        {
+            var handler = new TestAggregateDidSomethingHandler();
+            _bus.RegisterHandler<TestAggregateDidSomethingElse>((x, token) => handler.Handle(x));
+            _bus.RegisterHandler<TestAggregateDidSomethingElse>((x, token) => handler.Handle(x));
+            await _bus.Publish(new TestAggregateDidSomethingElse());
+            Assert.Equal(2, handler.TimesRun);
+        }
+
+        [Fact]
+        public async Task Should_publish_to_all_cancellation_handlers()
         {
             var handler = new TestAggregateDidSomethingHandler();
             _bus.RegisterHandler<TestAggregateDidSomething>(handler.Handle);
@@ -47,6 +58,16 @@ namespace CQRSlite.Tests.Bus
             _bus.RegisterHandler<TestAggregateDidSomething>(handler.Handle);
             await _bus.Publish(new TestAggregateDidSomething {LongRunning = true});
             Assert.Equal(1, handler.TimesRun);
+        }
+
+        [Fact]
+        public async Task Should_forward_cancellation_token()
+        {
+            var token = new CancellationToken();
+            var handler = new TestAggregateDidSomethingHandler();
+            _bus.RegisterHandler<TestAggregateDidSomething>(handler.Handle);
+            await _bus.Publish(new TestAggregateDidSomething {LongRunning = true}, token);
+            Assert.Equal(token, handler.Token);
         }
     }
 }

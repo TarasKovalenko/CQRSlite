@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 using CQRSCode.ReadModel.Dtos;
 using CQRSCode.ReadModel.Events;
@@ -7,19 +8,20 @@ using CQRSlite.Events;
 
 namespace CQRSCode.ReadModel.Handlers
 {
-    public class InventoryItemDetailView : IEventHandler<InventoryItemCreated>,
-											IEventHandler<InventoryItemDeactivated>,
-											IEventHandler<InventoryItemRenamed>,
-											IEventHandler<ItemsRemovedFromInventory>,
-											IEventHandler<ItemsCheckedInToInventory>
+    public class InventoryItemDetailView : ICancellableEventHandler<InventoryItemCreated>,
+        ICancellableEventHandler<InventoryItemDeactivated>,
+        ICancellableEventHandler<InventoryItemRenamed>,
+        ICancellableEventHandler<ItemsRemovedFromInventory>,
+        ICancellableEventHandler<ItemsCheckedInToInventory>
     {
-        public Task Handle(InventoryItemCreated message)
+        public Task Handle(InventoryItemCreated message, CancellationToken token)
         {
-            InMemoryDatabase.Details.Add(message.Id, new InventoryItemDetailsDto(message.Id, message.Name, 0, message.Version));
+            InMemoryDatabase.Details.Add(message.Id,
+                new InventoryItemDetailsDto(message.Id, message.Name, 0, message.Version));
             return Task.CompletedTask;
         }
 
-        public Task Handle(InventoryItemRenamed message)
+        public Task Handle(InventoryItemRenamed message, CancellationToken token)
         {
             var d = GetDetailsItem(message.Id);
             d.Name = message.NewName;
@@ -27,7 +29,7 @@ namespace CQRSCode.ReadModel.Handlers
             return Task.CompletedTask;
         }
 
-        private InventoryItemDetailsDto GetDetailsItem(Guid id)
+        private static InventoryItemDetailsDto GetDetailsItem(Guid id)
         {
             if (!InMemoryDatabase.Details.TryGetValue(id, out var dto))
             {
@@ -36,7 +38,7 @@ namespace CQRSCode.ReadModel.Handlers
             return dto;
         }
 
-        public Task Handle(ItemsRemovedFromInventory message)
+        public Task Handle(ItemsRemovedFromInventory message, CancellationToken token)
         {
             var dto = GetDetailsItem(message.Id);
             dto.CurrentCount -= message.Count;
@@ -44,7 +46,7 @@ namespace CQRSCode.ReadModel.Handlers
             return Task.CompletedTask;
         }
 
-        public Task Handle(ItemsCheckedInToInventory message)
+        public Task Handle(ItemsCheckedInToInventory message, CancellationToken token)
         {
             var dto = GetDetailsItem(message.Id);
             dto.CurrentCount += message.Count;
@@ -52,7 +54,7 @@ namespace CQRSCode.ReadModel.Handlers
             return Task.CompletedTask;
         }
 
-        public Task Handle(InventoryItemDeactivated message)
+        public Task Handle(InventoryItemDeactivated message, CancellationToken token)
         {
             InMemoryDatabase.Details.Remove(message.Id);
             return Task.CompletedTask;

@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using CQRSlite.Bus;
 using CQRSlite.Tests.Substitutes;
@@ -20,19 +21,29 @@ namespace CQRSlite.Tests.Bus
         [Fact]
         public async Task Should_run_handler()
         {
+            var handler = new TestAggregateDoSomethingElseHandler();
+            _bus.RegisterHandler<TestAggregateDoSomethingElse>((x, token) => handler.Handle(x));
+            await _bus.Send(new TestAggregateDoSomethingElse());
+
+            Assert.Equal(1, handler.TimesRun);
+        }
+
+        [Fact]
+        public async Task Should_run_cancellation_handler()
+        {
             var handler = new TestAggregateDoSomethingHandler();
             _bus.RegisterHandler<TestAggregateDoSomething>(handler.Handle);
             await _bus.Send(new TestAggregateDoSomething());
 
-            Assert.Equal(1,handler.TimesRun);
+            Assert.Equal(1, handler.TimesRun);
         }
 
         [Fact]
         public async Task Should_throw_if_more_handlers()
         {
-            var x = new TestAggregateDoSomethingHandler();
-            _bus.RegisterHandler<TestAggregateDoSomething>(x.Handle);
-            _bus.RegisterHandler<TestAggregateDoSomething>(x.Handle);
+            var handler = new TestAggregateDoSomethingHandler();
+            _bus.RegisterHandler<TestAggregateDoSomething>(handler.Handle);
+            _bus.RegisterHandler<TestAggregateDoSomething>(handler.Handle);
 
             await Assert.ThrowsAsync<InvalidOperationException>(async () => await _bus.Send(new TestAggregateDoSomething()));
         }
@@ -69,8 +80,18 @@ namespace CQRSlite.Tests.Bus
         {
             var handler = new TestAggregateDoSomethingHandler();
             _bus.RegisterHandler<TestAggregateDoSomething>(handler.Handle);
-            await _bus.Send(new TestAggregateDoSomething { LongRunning = true });
+            await _bus.Send(new TestAggregateDoSomething {LongRunning = true});
             Assert.Equal(1, handler.TimesRun);
+        }
+
+        [Fact]
+        public async Task Should_forward_cancellation_token()
+        {
+            var token = new CancellationToken();
+            var handler = new TestAggregateDoSomethingHandler();
+            _bus.RegisterHandler<TestAggregateDoSomething>(handler.Handle);
+            await _bus.Send(new TestAggregateDoSomething(), token);
+            Assert.Equal(token, handler.Token);
         }
     }
 }
