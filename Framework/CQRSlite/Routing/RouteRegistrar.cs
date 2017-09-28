@@ -7,21 +7,22 @@ using System.Threading.Tasks;
 using CQRSlite.Commands;
 using CQRSlite.Events;
 using CQRSlite.Infrastructure;
+using CQRSlite.Routing.Exception;
 
 namespace CQRSlite.Routing
 {
     public class RouteRegistrar
     {
-        private readonly IServiceLocator _serviceLocator;
+        private readonly IServiceProvider _serviceLocator;
 
-        public RouteRegistrar(IServiceLocator serviceLocator)
+        public RouteRegistrar(IServiceProvider serviceLocator)
         {
             _serviceLocator = serviceLocator ?? throw new ArgumentNullException(nameof(serviceLocator));
         }
 
         public void Register(params Type[] typesFromAssemblyContainingMessages)
         {
-            var registrar = _serviceLocator.GetService<IHandlerRegistrar>();
+            var registrar = (IHandlerRegistrar)_serviceLocator.GetService(typeof(IHandlerRegistrar));
 
             foreach (var typesFromAssemblyContainingMessage in typesFromAssemblyContainingMessages)
             {
@@ -54,27 +55,27 @@ namespace CQRSlite.Routing
                 .Single(mi => mi.GetParameters().Length == 1)
                 .MakeGenericMethod(commandType);
 
-            Func<object, CancellationToken, Task> del;
+            Func<object, CancellationToken, Task> func;
             if (IsCancellable(@interface))
             {
-                del = (x, token) =>
+                func = (@event, token) =>
                 {
                     var handler = _serviceLocator.GetService(executorType) ?? 
-                        throw new ArgumentNullException(nameof(executorType));
-                    return (Task) handler.Invoke("Handle",x, token);
+                        throw new HandlerNotResolvedException(nameof(executorType));
+                    return (Task) handler.Invoke("Handle", @event, token);
                 };
             }
             else
             {
-                del = (x, token) =>
+                func = (@event, token) =>
                 {
                     var handler = _serviceLocator.GetService(executorType) ?? 
-                        throw new ArgumentNullException(nameof(executorType));
-                    return (Task) handler.Invoke("Handle", x);
+                        throw new HandlerNotResolvedException(nameof(executorType));
+                    return (Task) handler.Invoke("Handle", @event);
                 };
             }
 
-            registerExecutorMethod.Invoke(registrar, new object[] { del });
+            registerExecutorMethod.Invoke(registrar, new object[] { func });
         }
 
         private static bool IsCancellable(Type @interface)
