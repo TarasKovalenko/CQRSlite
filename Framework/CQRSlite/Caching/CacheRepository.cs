@@ -8,6 +8,9 @@ using System.Threading.Tasks;
 
 namespace CQRSlite.Caching
 {
+    /// <summary>
+    /// Thread safe repository decorator that can cache aggregates.
+    /// </summary>
     public class CacheRepository : IRepository
     {
         private readonly IRepository _repository;
@@ -19,6 +22,12 @@ namespace CQRSlite.Caching
 
         private static SemaphoreSlim CreateLock(Guid _) => new SemaphoreSlim(1, 1);
 
+        /// <summary>
+        /// Initialize a new instance of CacheRepository
+        /// </summary>
+        /// <param name="repository">Reposiory that gets aggregate from event store</param>
+        /// <param name="eventStore">Eventstore where concurrency checking can be fetched from</param>
+        /// <param name="cache">Implementation of the cache</param>
         public CacheRepository(IRepository repository, IEventStore eventStore, ICache cache)
         {
             _repository = repository ?? throw new ArgumentNullException(nameof(repository));
@@ -35,15 +44,15 @@ namespace CQRSlite.Caching
             await @lock.WaitAsync(cancellationToken);
             try
             {
-                if (aggregate.Id != Guid.Empty && !_cache.IsTracked(aggregate.Id))
+                if (aggregate.Id != Guid.Empty && !await _cache.IsTracked(aggregate.Id))
                 {
-                    _cache.Set(aggregate.Id, aggregate);
+                    await _cache.Set(aggregate.Id, aggregate);
                 }
                 await _repository.Save(aggregate, expectedVersion, cancellationToken);
             }
             catch (Exception)
             {
-                _cache.Remove(aggregate.Id);
+                await _cache.Remove(aggregate.Id);
                 throw;
             }
             finally
@@ -60,13 +69,13 @@ namespace CQRSlite.Caching
             try
             {
                 T aggregate;
-                if (_cache.IsTracked(aggregateId))
+                if (await _cache.IsTracked(aggregateId))
                 {
-                    aggregate = (T) _cache.Get(aggregateId);
+                    aggregate = (T) await _cache.Get(aggregateId);
                     var events = await _eventStore.Get(aggregateId, aggregate.Version, cancellationToken);
                     if (events.Any() && events.First().Version != aggregate.Version + 1)
                     {
-                        _cache.Remove(aggregateId);
+                        await _cache.Remove(aggregateId);
                     }
                     else
                     {
@@ -76,12 +85,12 @@ namespace CQRSlite.Caching
                 }
 
                 aggregate = await _repository.Get<T>(aggregateId, cancellationToken);
-                _cache.Set(aggregateId, aggregate);
+                await _cache.Set(aggregateId, aggregate);
                 return aggregate;
             }
             catch (Exception)
             {
-                _cache.Remove(aggregateId);
+                await _cache.Remove(aggregateId);
                 throw;
             }
             finally

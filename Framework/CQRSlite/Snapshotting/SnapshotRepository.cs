@@ -9,6 +9,9 @@ using CQRSlite.Infrastructure;
 
 namespace CQRSlite.Snapshotting
 {
+    /// <summary>
+    /// Repository decorator that can snapshot aggregates.
+    /// </summary>
     public class SnapshotRepository : IRepository
     {
         private readonly ISnapshotStore _snapshotStore;
@@ -16,6 +19,13 @@ namespace CQRSlite.Snapshotting
         private readonly IRepository _repository;
         private readonly IEventStore _eventStore;
 
+        /// <summary>
+        /// Initialize a new instance of SnapshotRepository
+        /// </summary>
+        /// <param name="snapshotStore">ISnapshotStore snapshots should be saved to and fetched from</param>
+        /// <param name="snapshotStrategy">ISnapshotStrategy on when to take and if to restore from snapshot</param>
+        /// <param name="repository">Reposiory that gets aggregate from event store</param>
+        /// <param name="eventStore">Event store where events after snapshot can be fetched from</param>
         public SnapshotRepository(ISnapshotStore snapshotStore, ISnapshotStrategy snapshotStrategy, IRepository repository, IEventStore eventStore)
         {
             _snapshotStore = snapshotStore ?? throw new ArgumentNullException(nameof(snapshotStore));
@@ -49,7 +59,7 @@ namespace CQRSlite.Snapshotting
             var snapshot = await _snapshotStore.Get(id, cancellationToken);
             if (snapshot == null)
                 return -1;
-            aggregate.Invoke("Restore", snapshot);
+            aggregate.Invoke("Restore", true, snapshot);
             return snapshot.Version;
         }
 
@@ -58,7 +68,7 @@ namespace CQRSlite.Snapshotting
             if (!_snapshotStrategy.ShouldMakeSnapShot(aggregate))
                 return Task.FromResult(0);
 
-            dynamic snapshot = aggregate.Invoke("GetSnapshot");
+            dynamic snapshot = aggregate.Invoke("GetSnapshot", true);
             snapshot.Version = aggregate.Version + aggregate.GetUncommittedChanges().Length;
             return _snapshotStore.Save(snapshot);
         }
