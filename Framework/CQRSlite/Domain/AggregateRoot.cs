@@ -3,6 +3,7 @@ using CQRSlite.Events;
 using CQRSlite.Infrastructure;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace CQRSlite.Domain
 {
@@ -48,7 +49,7 @@ namespace CQRSlite.Domain
                     @event.Version = Version + i;
                     @event.TimeStamp = DateTimeOffset.UtcNow;
                 }
-                Version = Version + _changes.Count;
+                Version = Version + changes.Length;
                 _changes.Clear();
                 return changes;
             }
@@ -57,48 +58,42 @@ namespace CQRSlite.Domain
         /// <summary>
         /// Load an aggregate from an enumerable of events.
         /// </summary>
-        /// <param name="history"></param>
+        /// <param name="history">All events to be loaded.</param>
         public void LoadFromHistory(IEnumerable<IEvent> history)
-        {
-            foreach (var e in history)
-            {
-                if (e.Version != Version + 1)
-                {
-                    throw new EventsOutOfOrderException(e.Id);
-                }
-                ApplyChange(e, false);
-            }
-        }
-
-        protected void ApplyChange(IEvent @event)
-        {
-            ApplyChange(@event, true);
-        }
-
-        private void ApplyChange(IEvent @event, bool isNew)
         {
             lock (_changes)
             {
-                Apply(@event);
-                if (isNew)
+                foreach (var e in history.ToArray())
                 {
-                    _changes.Add(@event);
-                }
-                else
-                {
-                    Id = @event.Id;
+                    if (e.Version != Version + 1)
+                    {
+                        throw new EventsOutOfOrderException(e.Id);
+                    }
+                    ApplyEvent(e);
+                    Id = e.Id;
                     Version++;
                 }
             }
         }
 
-        /// <summary>
-        /// Overrideable method for invoking events on aggregate
-        /// </summary>
-        /// <param name="event">Event to invoke</param>
-        protected virtual void Apply(IEvent @event)
+        protected void ApplyChange(IEvent @event)
         {
-            this.Invoke("Apply", true, @event);
+            lock (_changes)
+            {
+                ApplyEvent(@event);
+                _changes.Add(@event);
+            }
+        }
+
+        /// <summary>
+        /// Overrideable method for applying events on aggregate
+        /// This is called interally when rehydrating aggregates.
+        /// Can be overridden if you want custom handling.
+        /// </summary>
+        /// <param name="event">Event to apply</param>
+        protected virtual void ApplyEvent(IEvent @event)
+        {
+            this.Invoke("Apply", @event);
         }
     }
 }
