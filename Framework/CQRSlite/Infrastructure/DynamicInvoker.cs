@@ -14,21 +14,21 @@ namespace CQRSlite.Infrastructure
         internal static object Invoke<T>(this T obj, string methodname, params object[] args)
         {
             var type = obj.GetType();
-            var hash = Hash(type,  methodname, args);
+            var hash = Hash(type, methodname, args);
             var exists = _cachedMembers.TryGetValue(hash, out var method);
             if (exists) return method?.Invoke(obj, args);
             lock (_lockObj)
             {
                 //Recheck if exist inside lock in case another thread has added it.
                 exists = _cachedMembers.TryGetValue(hash, out method);
-                var dict = new Dictionary<int, CompiledMethodInfo>(_cachedMembers);
                 if (exists) return method?.Invoke(obj, args);
 
                 var argtypes = GetArgTypes(args);
                 var m = GetMember(type, methodname, argtypes);
                 method = m == null ? null : new CompiledMethodInfo(m, type);
 
-                dict.Add(hash, method);
+                var dict = new Dictionary<int, CompiledMethodInfo>(_cachedMembers) {{hash, method}};
+
                 _cachedMembers = dict;
                 return method?.Invoke(obj, args);
             }
