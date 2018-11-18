@@ -14,7 +14,7 @@ namespace CQRSlite.Tests.Routing
     public class When_registering_all_handlers_in_assembly
     {
         private readonly TestServiceLocator _locator;
-        private TestHandleRegistrar _testHandleRegistrar;
+        private readonly TestHandleRegistrar _testHandleRegistrar;
 
         public When_registering_all_handlers_in_assembly()
         {
@@ -27,7 +27,7 @@ namespace CQRSlite.Tests.Routing
         [Fact]
         public void Should_register_all_handlers()
         {
-            Assert.Equal(8, _testHandleRegistrar.HandlerList.Count);
+            Assert.Equal(10, _testHandleRegistrar.HandlerList.Count);
         }
 
         [Fact]
@@ -62,7 +62,7 @@ namespace CQRSlite.Tests.Routing
 #endif
                 }
             }
-            Assert.Equal(11, _locator.Handlers.Count);
+            Assert.Equal(13, _locator.Handlers.Count);
         }
 
         [Fact]
