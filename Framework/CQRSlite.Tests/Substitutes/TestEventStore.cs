@@ -9,20 +9,18 @@ namespace CQRSlite.Tests.Substitutes
 {
     public class TestEventStore : IEventStore
     {
-        private readonly Guid _emptyGuid;
         private List<IEvent> SavedEvents { get; }
         public CancellationToken Token { get; private set; }
 
         public TestEventStore()
         {
-            _emptyGuid = Guid.NewGuid();
             SavedEvents = new List<IEvent>();
         }
 
-        public Task<IEnumerable<IEvent>> Get(Guid aggregateId, int version, CancellationToken cancellationToken = default(CancellationToken))
+        public Task<IEnumerable<IEvent>> Get(Guid aggregateId, int version, CancellationToken cancellationToken = default)
         {
             Token = cancellationToken;
-            if (aggregateId == _emptyGuid || aggregateId == Guid.Empty)
+            if (aggregateId == default)
             {
                 return Task.FromResult((IEnumerable<IEvent>)new List<IEvent>());
             }
@@ -35,7 +33,7 @@ namespace CQRSlite.Tests.Substitutes
             }.Where(x => x.Version > version));
         }
 
-        public Task Save(IEnumerable<IEvent> events, CancellationToken cancellationToken = default(CancellationToken))
+        public Task Save(IEnumerable<IEvent> events, CancellationToken cancellationToken = default)
         {
             Token = cancellationToken;
             SavedEvents.AddRange(events);

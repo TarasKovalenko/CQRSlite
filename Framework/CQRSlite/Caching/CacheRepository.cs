@@ -38,13 +38,13 @@ namespace CQRSlite.Caching
         }
 
         public async Task Save<T>(T aggregate, int? expectedVersion = null,
-            CancellationToken cancellationToken = default(CancellationToken)) where T : AggregateRoot
+            CancellationToken cancellationToken = default) where T : AggregateRoot
         {
             var @lock = _locks.GetOrAdd(aggregate.Id, CreateLock);
             await @lock.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                if (aggregate.Id != Guid.Empty && !await _cache.IsTracked(aggregate.Id).ConfigureAwait(false))
+                if (aggregate.Id != default && !await _cache.IsTracked(aggregate.Id).ConfigureAwait(false))
                 {
                     await _cache.Set(aggregate.Id, aggregate).ConfigureAwait(false);
                 }
@@ -61,7 +61,7 @@ namespace CQRSlite.Caching
             }
         }
 
-        public async Task<T> Get<T>(Guid aggregateId, CancellationToken cancellationToken = default(CancellationToken))
+        public async Task<T> Get<T>(Guid aggregateId, CancellationToken cancellationToken = default)
             where T : AggregateRoot
         {
             var @lock = _locks.GetOrAdd(aggregateId, CreateLock);
